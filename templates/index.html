@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta name="viewport" content="width=device-width">
+<meta charset="UTF-8">
+
+<head>
+    <title>Next Song Prediction</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+    <div class="container">
+        <h1>🎵 Next Song Prediction</h1>
+
+        <form method="POST">
+            <input type="text" name="track_name" placeholder="Enter current song name" required>
+            <button type="submit">Predict Next Song</button>
+        </form>
+
+        {% if next_song %}
+        <h2>Next Recommended Song</h2>
+        <div class="song-card">
+            <p><b>Song:</b> {{ next_song.track_name }}</p>
+            <p><b>Artist:</b> {{ next_song.artist }}</p>
+            <p><b>Album:</b> {{ next_song.album }}</p>
+            <p><b>Genre:</b> {{ next_song.genre }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+
+</html>
