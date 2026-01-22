@@ -2,10 +2,17 @@ import pandas as pd
 from sklearn.preprocessing import LabelEncoder
 from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
+import os
 
-# Load dataset
-df = pd.read_csv("D:\Projects\Arya\College_Stuff\Sem 6\Spotify_Recommendation\spotify_dataset.csv")
-df.fillna("Unknown", inplace=True)
+
+# Get the directory where this script (spotify_recommendation.py) is located
+current_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Create the full path to the CSV file dynamically
+csv_path = os.path.join(current_dir, "spotify_dataset.csv")
+
+# Load the dataset using the dynamic path
+df = pd.read_csv(csv_path)df.fillna("Unknown", inplace=True)
 
 # Feature Engineering
 df['release_year'] = pd.to_datetime(df['Release Date'], errors='coerce').dt.year
@@ -92,3 +99,4 @@ def next_song_prediction(track_name):
         'album': next_song['album'],
         'genre': next_song['genre']
     }
+
