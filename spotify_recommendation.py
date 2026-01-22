@@ -4,55 +4,68 @@ from sklearn.ensemble import RandomForestRegressor
 from xgboost import XGBRegressor
 import os
 
-
-# Get the directory where this script (spotify_recommendation.py) is located
+# --- PATH FIX FOR CLOUD DEPLOYMENT ---
+# Get the directory where this script is located
 current_dir = os.path.dirname(os.path.abspath(__file__))
 
 # Create the full path to the CSV file dynamically
 csv_path = os.path.join(current_dir, "spotify_dataset.csv")
 
-# Load the dataset using the dynamic path
-df = pd.read_csv(csv_path)df.fillna("Unknown", inplace=True)
+# Load the dataset
+try:
+    df = pd.read_csv(csv_path)
+except FileNotFoundError:
+    # Fallback in case of path issues, prevents immediate crash on import
+    print(f"Error: Could not find file at {csv_path}")
+    df = pd.DataFrame() 
 
-# Feature Engineering
-df['release_year'] = pd.to_datetime(df['Release Date'], errors='coerce').dt.year
-df['release_year'].fillna(df['release_year'].median(), inplace=True)
+# -------------------------------------
 
-le_genre = LabelEncoder()
-le_artist = LabelEncoder()
-le_album = LabelEncoder()
+if not df.empty:
+    df.fillna("Unknown", inplace=True)
 
-df['genre_enc'] = le_genre.fit_transform(df['genre'])
-df['artist_enc'] = le_artist.fit_transform(df['artist'])
-df['album_enc'] = le_album.fit_transform(df['album'])
+    # Feature Engineering
+    df['release_year'] = pd.to_datetime(df['Release Date'], errors='coerce').dt.year
+    df['release_year'].fillna(df['release_year'].median(), inplace=True)
 
-df['artist_song_count'] = df.groupby('artist')['artist'].transform('count')
-df['album_song_count'] = df.groupby('album')['album'].transform('count')
+    le_genre = LabelEncoder()
+    le_artist = LabelEncoder()
+    le_album = LabelEncoder()
 
-features = [
-    'genre_enc',
-    'artist_enc',
-    'album_enc',
-    'artist_song_count',
-    'album_song_count',
-    'release_year'
-]
+    df['genre_enc'] = le_genre.fit_transform(df['genre'])
+    df['artist_enc'] = le_artist.fit_transform(df['artist'])
+    df['album_enc'] = le_album.fit_transform(df['album'])
 
-X = df[features]
-y = df['popularity']
+    df['artist_song_count'] = df.groupby('artist')['artist'].transform('count')
+    df['album_song_count'] = df.groupby('album')['album'].transform('count')
 
-# Models
-rf = RandomForestRegressor(n_estimators=100, random_state=42)
-rf.fit(X, y)
+    features = [
+        'genre_enc',
+        'artist_enc',
+        'album_enc',
+        'artist_song_count',
+        'album_song_count',
+        'release_year'
+    ]
 
-xgb = XGBRegressor(n_estimators=100, random_state=42)
-xgb.fit(X, y)
+    X = df[features]
+    y = df['popularity']
+
+    # Models
+    rf = RandomForestRegressor(n_estimators=100, random_state=42)
+    rf.fit(X, y)
+
+    xgb = XGBRegressor(n_estimators=100, random_state=42)
+    xgb.fit(X, y)
 
 def ensemble_predict(X):
     return (rf.predict(X) + xgb.predict(X)) / 2
 
 # 🎵 NEXT SONG PREDICTION FUNCTION
 def next_song_prediction(track_name):
+    if df.empty:
+        return None
+        
     track_name = track_name.lower()
 
     current_song = df[df['track_name'].str.lower() == track_name]
@@ -99,4 +112,3 @@ def next_song_prediction(track_name):
         'album': next_song['album'],
         'genre': next_song['genre']
     }
-
