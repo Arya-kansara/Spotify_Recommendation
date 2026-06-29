@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Next Song Prediction</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <div class="main-wrapper">
+        <!-- Left Panel: Prediction -->
+        <div class="left-panel">
+            <div class="container">
+                <h1>🎵 Next Song Prediction</h1>
+
+                <form method="POST">
+                    <div class="autocomplete">
+                        <input type="text" id="trackSearch" name="track_name" placeholder="Search a song name..." required autocomplete="off">
+                        <div id="autocomplete-list" class="autocomplete-items"></div>
+                    </div>
+                    
+                    <div class="filters-group">
+                        <select name="genre_filter" class="form-select">
+                            <option value="all">Any Genre</option>
+                            {% if genres %}
+                                {% for g in genres %}
+                                <option value="{{ g }}">{{ g }}</option>
+                                {% endfor %}
+                            {% endif %}
+                        </select>
+                        
+                        <select name="limit" class="form-select">
+                            <option value="5">5 Recommendations</option>
+                            <option value="10">10 Recommendations</option>
+                            <option value="20">20 Recommendations</option>
+                        </select>
+                    </div>
+
+                    <button type="submit">Predict Next Song</button>
+                </form>
+
+                {% if next_song %}
+                <h2>🎧 Top 5 Recommendations</h2>
+                <div class="recommendations-container">
+                    {% for song in next_song %}
+                    <div class="song-card recommendation-card">
+                        <div class="recommendation-badge">{{ loop.index }}</div>
+                        <p><b>Song:</b> {{ song.track_name }}</p>
+                        <p><b>Artist:</b> {{ song.artist }}</p>
+                        <p><b>Album:</b> {{ song.album }}</p>
+                        <p><b>Genre:</b> {{ song.genre }}</p>
+                        <p class="popularity-score"><b>Popularity:</b> ⭐ {{ "%.0f"|format(song.popularity) }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right Panel: Playlist -->
+        <div class="right-panel">
+            <div class="playlist-container">
+                <h2>🎼 Available Songs</h2>
+
+                <input type="text" id="filterInput" placeholder="🔍 Filter by song name, artist, album, or genre..."
+                    class="filter-input">
+
+                <div class="filter-tabs">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="artist">Artist</button>
+                    <button class="filter-btn" data-filter="genre">Genre</button>
+                </div>
+
+                <div id="playlistContainer" class="playlist">
+                    <p class="loading">Loading songs...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allSongs = [];
+        let currentFilter = 'all';
+
+        // Load all songs on page load
+        document.addEventListener('DOMContentLoaded', function () {
+            fetch('/songs')
+                .then(response => response.json())
+                .then(songs => {
+                    allSongs = songs;
+                    displayPlaylist(allSongs);
+                })
+                .catch(error => {
+                    console.error('Error loading songs:', error);
+                    document.getElementById('playlistContainer').innerHTML =
+                        '<p class="error">Failed to load songs</p>';
+                });
+        });
+
+        // Filter input
+        document.getElementById('filterInput').addEventListener('keyup', filterSongs);
+
+        // Filter tabs
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                filterSongs();
+            });
+        });
+
+        function filterSongs() {
+            const query = document.getElementById('filterInput').value.toLowerCase();
+
+            let filtered = allSongs;
+
+            // Filter by current tab
+            if (currentFilter === 'artist') {
+                filtered = filtered.filter(song =>
+                    song.artist.toLowerCase().includes(query)
+                );
+            } else if (currentFilter === 'genre') {
+                filtered = filtered.filter(song =>
+                    song.genre.toLowerCase().includes(query)
+                );
+            } else {
+                // Search all fields
+                filtered = filtered.filter(song =>
+                    song.track_name.toLowerCase().includes(query) ||
+                    song.artist.toLowerCase().includes(query) ||
+                    song.album.toLowerCase().includes(query) ||
+                    song.genre.toLowerCase().includes(query)
+                );
+            }
+
+            displayPlaylist(filtered);
+        }
+
+        function displayPlaylist(songs) {
+            const container = document.getElementById('playlistContainer');
+
+            if (songs.length === 0) {
+                container.innerHTML = '<p class="no-results">No songs found</p>';
+                return;
+            }
+
+            const html = songs.map((song, index) => `
+                <div class="playlist-item" onclick="useThisSong('${song.track_name.replace(/'/g, "\\'")}')">
+                    <div class="item-number">${index + 1}</div>
+                    <div class="item-info">
+                        <div class="song-title">${song.track_name}</div>
+                        <div class="song-artist">${song.artist}</div>
+                        <div class="song-meta">${song.album} • ${song.genre}</div>
+                    </div>
+                    <div class="popularity">⭐ ${Math.round(song.popularity)}</div>
+                </div>
+            `).join('');
+
+            container.innerHTML = html;
+        }
+
+        // Autocomplete for song search
+        const searchInput = document.getElementById('trackSearch');
+        const autocompleteList = document.getElementById('autocomplete-list');
+        
+        searchInput.addEventListener('input', function() {
+            const query = this.value;
+            if (!query) {
+                autocompleteList.innerHTML = '';
+                return;
+            }
+            
+            fetch(`/search?q=${encodeURIComponent(query)}`)
+                .then(res => res.json())
+                .then(data => {
+                    autocompleteList.innerHTML = '';
+                    data.forEach(song => {
+                        const div = document.createElement('div');
+                        div.innerHTML = song;
+                        div.addEventListener('click', function() {
+                            searchInput.value = song;
+                            autocompleteList.innerHTML = '';
+                        });
+                        autocompleteList.appendChild(div);
+                    });
+                });
+        });
+
+        // Close autocomplete when clicking outside
+        document.addEventListener('click', function (e) {
+            if (e.target !== searchInput && e.target !== autocompleteList) {
+                autocompleteList.innerHTML = '';
+            }
+        });
+
+        function useThisSong(trackName) {
+            document.querySelector('input[name="track_name"]').value = trackName;
+            document.querySelector('form').submit();
+        }
+    </script>
+
+</body>
+
+</html>
